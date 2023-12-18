@@ -1,33 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
-import 'package:flutter_simple_page/Views/login.dart';
 import 'package:salomon_bottom_bar/salomon_bottom_bar.dart';
-
+import '../Models/Product.dart';
+import '../Models/Categorie.dart';
 import '../Services/ApiClient.dart';
 import '../Utils/Consts.dart';
 import '../Widgets/MenuBar.dart';
-
-class Post {
-  final String username;
-  final String userImage;
-  final int id;
-  final String body;
-  final List<String> images;
-  final int likesCount;
-  final bool selfLiked;
-  final int commentsCount;
-
-  Post({
-    required this.username,
-    required this.userImage,
-    required this.id,
-    required this.body,
-    required this.images,
-    required this.likesCount,
-    required this.selfLiked,
-    required this.commentsCount,
-  });
-}
+import 'package:shared_preferences/shared_preferences.dart';
+import 'CategoryProductsScreen.dart';
+import 'ProductDescription.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -35,95 +16,410 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<Post> _postList = [];
+  List<Product> _productList = [];
   int _selectedIndex = 0;
+  final ApiClient _apiClient = ApiClient();
+  List<Categorie> _categories = [];
 
-  // Define a GlobalKey for the Scaffold to open the drawer from the app bar
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+    final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>(); // Define _scaffoldKey
+
 
   @override
   void initState() {
-    // Add static post data
-    _postList = [
-      Post(
-        username: 'Mejri Mohamed ali',
-        userImage: 'https://scontent.ftun1-2.fna.fbcdn.net/v/t39.30808-6/376685528_2299756693553222_1992828648671393085_n.jpg?_nc_cat=104&ccb=1-7&_nc_sid=5f2048&_nc_ohc=u4WvCz5UB1UAX_qzuNF&_nc_ht=scontent.ftun1-2.fna&cb_e2o_trans=q&oh=00_AfDsvNuftcA_6uA3xT5uT8lqtbOVqRezMQ4Sf_djRCOT8Q&oe=653DC6A1',
-        id: 1,
-        body: 'Audi 80',
-        images: [
-          'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Audi80-1992.JPG/1200px-Audi80-1992.JPG',
-          'https://upload.wikimedia.org/wikipedia/commons/2/2c/1989_Audi_80_S_1.8.jpg',
-          'https://upload.wikimedia.org/wikipedia/commons/d/d0/Audi_80_B4_Red.jpg',
-          'https://voyage.aprr.fr/sites/default/files/styles/banner_image/public/2022-03/Audi%2080.jpeg?itok=LUyWuACK',
-        ],
-        likesCount: 10,
-        selfLiked: false,
-        commentsCount: 5,
-      ),
-      // Add more static posts as needed
-    ];
-
+    _fetchProducts();
+    _fetchCategories(); // Fetch categories
     super.initState();
   }
+
+  Future<void> _fetchProducts() async {
+    try {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      var iduser = prefs.getString('id');
+
+      if (iduser != null) {
+        final products = await ApiClient.getProducts(iduser);
+        setState(() {
+          _productList = products;
+        });
+      } else {
+        print('no id ');
+      }
+    } catch (e) {
+      print('Error fetching products: $e');
+    }
+  }
+
+  Future<void> _fetchCategories() async {
+    try {
+      final categories = await ApiClient.getCategories();
+      setState(() {
+        _categories = categories;
+      });
+    } catch (e) {
+      print('Error fetching categories: $e');
+    }
+  }
+
+  Widget _buildProductItem(Product product) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDescription(product: product),
+          ),
+        );
+      },
+      child: Container(
+        width: 150,
+        height: 50,
+        margin: EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.5),
+              spreadRadius: 1,
+              blurRadius: 2,
+              offset: Offset(0, 3),
+            ),
+          ],
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (product.images.isNotEmpty)
+              CarouselSlider(
+                options: CarouselOptions(
+                  autoPlay: false,
+                  enlargeCenterPage: true,
+                ),
+                items: product.images.map((imagePath) {
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      imagePath,
+                      height: 50,
+                      width: 270,
+                    ),
+                  );
+                }).toList(),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Text(
+                product.nomProduit.length <= 20
+                    ? product.nomProduit
+                    : product.nomProduit.substring(0, 20) + '...',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${product.added}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color.fromARGB(255, 9, 9, 9),
+                      backgroundColor: Color.fromARGB(255, 178, 249, 251),
+                    ),
+                  ),
+                  Icon(
+                    Icons.favorite_border,
+                    color: Colors.grey,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+Widget _buildCategoryCarousel() {
+  return CarouselSlider(
+    options: CarouselOptions(
+      autoPlay: false,
+      enlargeCenterPage: true,
+    ),
+    items: _categories.map((category) {
+      return GestureDetector(
+        onTap: () {
+        print("Category tapped");
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CategoryProductsScreen(category: category),
+          ),
+        );
+      },
+        child: Container(
+          width: 150,
+          height: 50,
+          margin: EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.5),
+                spreadRadius: 1,
+                blurRadius: 2,
+                offset: Offset(0, 3),
+              ),
+            ],
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(
+                  category.image,
+                  height: 50,
+                  width: 150,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Text(
+                  category.categorieName,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }).toList(),
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldKey, // Assign the key to the Scaffold
+      key: _scaffoldKey,
       appBar: AppBar(
-        backgroundColor: Color.fromARGB(255, 152, 185, 252),
-        titleSpacing: 00.0,
+        title: Text('Accueil', style: TextStyle(color: Colors.white)),
         centerTitle: true,
-        toolbarHeight: 60.2,
-        toolbarOpacity: 0.8,
       ),
       drawer: buildMenuBar(selectedIndex: _selectedIndex),
-      body: ListView.builder(
-        itemCount: _postList.length,
-        itemBuilder: (BuildContext context, int index) {
-          Post post = _postList[index];
-          return Container(
-            padding: EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: NetworkImage(post.userImage),
-                  ),
-                  title: Text(post.username),
-                ),
-                SizedBox(height: 8),
-                Text(post.body),
-                if (post.images.isNotEmpty)
-                  CarouselSlider(
-                    options: CarouselOptions(
-                      autoPlay: false,
-                      enlargeCenterPage: true,
-                    ),
-                    items: post.images
-                        .map((image) => GestureDetector(
-                              onTap: () {
-                                // Handle image tap to view in detail
-                              },
-                              child: Container(
-                                margin: EdgeInsets.symmetric(vertical: 8),
-                                height: 200,
-                                decoration: BoxDecoration(
-                                  image: DecorationImage(
-                                    image: NetworkImage(image),
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                Divider(),
-              ],
+      body: Column(
+        children: [
+          Expanded(
+            child: CustomScrollView(
+              slivers: <Widget>[
+                
+                SliverList(
+  delegate: SliverChildListDelegate(
+    [
+      Divider(),
+
+      CarouselSlider(
+  options: CarouselOptions(
+    autoPlay: true,
+    enlargeCenterPage: false,
+    aspectRatio: 6 / 2,
+  ),
+  items: [
+    Image.asset('assets/image1.jpg', fit: BoxFit.cover),
+    Image.asset('assets/image2.jpg', fit: BoxFit.cover),
+  ].map((Widget image) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10.0), // Set border radius as needed
+      child: image,
+    );
+  }).toList(),
+),
+Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Divider(),
+    Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Container(
+          margin: EdgeInsets.only(left: 10, right: 10), // Adjust margins as needed
+          child: Text(
+            "Catégories",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    ),
+  ],
+),Divider(),
+Container(
+  margin: EdgeInsets.symmetric(horizontal: 10),
+  height: 90.0,
+  child: ListView.builder(
+    scrollDirection: Axis.horizontal,
+    itemCount: _categories.length,
+    itemBuilder: (BuildContext context, int index) {
+      Categorie category = _categories[index];
+      return GestureDetector(
+        onTap: () {
+          print("Category tapped: ${category.categorieName}");
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CategoryProductsScreen(category: category),
             ),
           );
         },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40), // Adjusted padding
+          child: Column(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(10.0),
+                  child: Image.network(
+                    category.image,
+                    width: 30.0,
+                    height: 30.0,
+                  ),
+                ),
+              ),
+              Text(
+                category.categorieName,
+                style: TextStyle(fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  ),
+),
+            ],
+          ),
+        ),
+                SliverToBoxAdapter(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Row(
+                  children: [
+                    Text(
+                      "Les plus récents",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Spacer(),
+                    SizedBox(width: 10),
+                    TextButton(
+                      onPressed: null, // Set onPressed to null for no functionality
+                      child: Text(
+                        "Voir tout",
+                        style: TextStyle(color: Colors.blue),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+                SliverToBoxAdapter(
+                  child: Container(
+                    height: 300,
+                    child: CustomScrollView(
+                      slivers: <Widget>[
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (BuildContext context, int index) {
+                              Product product = _productList[index];
+                              return SizedBox(
+                                width: 350,
+                                height: 150,
+                                child: _buildProductItem(product),
+                              );
+                            },
+                            childCount: _productList.length,
+                          ),
+                        ),
+                      ],
+                      scrollDirection: Axis.horizontal,
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Row(
+                  children: [
+                    Text(
+                      "Différents produits",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Spacer(),
+                    SizedBox(width: 10),
+                    TextButton(
+                      onPressed: null,
+                      child: Text(
+                        "Voir tout",
+                        style: TextStyle(color: Colors.blue),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+                SliverToBoxAdapter(
+                  child: Container(
+                    height: 250,
+                    child: CustomScrollView(
+                      slivers: <Widget>[
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (BuildContext context, int index) {
+                              Product product = _productList[index];
+                              return SizedBox(
+                                width: 250,
+                                height: 150,
+                                child: _buildProductItem(product),
+                              );
+                            },
+                            childCount: _productList.length,
+                          ),
+                        ),
+                      ],
+                      scrollDirection: Axis.horizontal,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: SalomonBottomBar(
         currentIndex: _selectedIndex,
@@ -139,10 +435,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-}
-
-void main() {
-  runApp(MaterialApp(
-    home: HomeScreen(),
-  ));
 }

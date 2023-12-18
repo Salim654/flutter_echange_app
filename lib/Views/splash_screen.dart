@@ -12,58 +12,75 @@ class PageSplashScreen extends StatefulWidget {
   State<PageSplashScreen> createState() => _PageSplashScreenState();
 }
 
-class _PageSplashScreenState extends State<PageSplashScreen> {
+class _PageSplashScreenState extends State<PageSplashScreen> with SingleTickerProviderStateMixin {
+  AnimationController? _animationController;
+  Animation<double>? _animation;
+
   @override
   void initState() {
     super.initState();
-    Timer(
-      const Duration(seconds: 3),
-      () async {
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        String? token = prefs.getString('token');
-        if (token != null && token.isNotEmpty) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomeScreen(),
-            ),
-          );
-        } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const PageLogin(),
-            ),
-          );
-        }
-      },
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
     );
+
+    _animation = CurvedAnimation(
+      parent: _animationController!,
+      curve: Curves.easeOut // Use a different curve if needed
+    );
+
+    _animationController!.addListener(() {
+      setState(() {
+        // Empty setState to rebuild the widget when animation updates
+      });
+
+      if (_animationController!.isCompleted) {
+         checkTokenAndRedirect();
+      }
+    });
+
+    _animationController!.forward();
+  }
+void checkTokenAndRedirect() async {
+  final prefs = await SharedPreferences.getInstance();
+  if (prefs.containsKey('token') && prefs.getString('token') != null) {
+    
+    Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+  }else{
+    Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => PageLogin()),
+        );
+  }
+}
+  @override
+  void dispose() {
+    _animationController!.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    SizeConfig().init(context);
     return Scaffold(
-      backgroundColor: Colors.teal.shade500,
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(
-              'assets/splash.png', // Replace with your image asset
-              width: getProportionateScreenWidth(200), // Adjust the width as needed
-            ),
-            SizedBox(height: getProportionateScreenHeight(20)),
-            Text(
-              "Haya Nbadlou",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: getProportionateScreenWidth(28),
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+        child: AnimatedBuilder(
+          animation: _animationController!,
+          builder: (context, child) {
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/splash.png',
+                  width: _animation!.value * 275,
+                  height: _animation!.value * 275,
+                ),
+                const Text(
+                  "HAYA NBADLOU",
+                  style: TextStyle(fontSize: 24, color: Colors.grey),
+                )
+              ],
+            );
+          },
         ),
       ),
     );

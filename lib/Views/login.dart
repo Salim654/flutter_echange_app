@@ -47,6 +47,7 @@ class _PageLoginState extends State<PageLogin> {
           final user = jsonResponse['user'];
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('token', token);
+          await prefs.setString('id', user['id'].toString());
           await prefs.setString('name', user['name']); // Store user's name
           await prefs.setString('email', user['email']); // Store user's email
           fetchUserData(); // Fetch user data after login
@@ -84,7 +85,7 @@ class _PageLoginState extends State<PageLogin> {
           children: [
     SizedBox(height: SizeConfig.screenHeight * 0.1),
     Image.asset(
-      'assets/loginn.png', // Image for "Hello, Welcome Back"
+      'assets/logedin.png', // Image for "Hello, Welcome Back"
       height: getProportionateScreenHeight(150), // Adjust the height as needed
     ), Text(
                 "Login",
